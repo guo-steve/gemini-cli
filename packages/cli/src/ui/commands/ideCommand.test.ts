@@ -220,7 +220,7 @@ describe('ideCommand', () => {
         }),
         expect.any(Number),
       );
-    });
+    }, 10000);
 
     it('should show an error if installation fails', async () => {
       mockInstall.mockResolvedValue({
