@@ -582,34 +582,44 @@ describe('GeminiChat', () => {
     });
   });
 
-  it('should fail and throw an error after all retries on persistent invalid content', async () => {
-    // All calls will return an invalid stream
-    const invalidStream = (async function* () {
-      yield {
-        candidates: [
-          {
-            content: {
-              parts: [{ text: '' }],
-              role: 'model',
+  it('should fail after all retries on persistent invalid content', async () => {
+      // All calls will return an invalid stream
+      const invalidStream = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                parts: [{ text: '' }],
+                role: 'model',
+              },
             },
-          },
-        ],
-      } as unknown as GenerateContentResponse;
-    })();
-    vi.mocked(mockModelsModule.generateContentStream).mockResolvedValue(
-      invalidStream,
-    );
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+      vi.mocked(mockModelsModule.generateContentStream).mockResolvedValue(
+        invalidStream,
+      );
 
-    // FIX: Changed to assert against the error class instead of the message string.
-    await expect(
-      chat.sendMessageStream({ message: 'test' }, 'prompt-id-retry-fail'),
-    ).rejects.toThrow(EmptyStreamError);
+      // FIX: The test must consume the async generator to trigger the error.
+      const streamPromise = chat.sendMessageStream(
+        { message: 'test' },
+        'prompt-id-retry-fail',
+      );
+      
+      // This is the correct way to test a generator that throws.
+      await expect(async () => {
+        const stream = await streamPromise;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        for await (const _ of stream) {
+          // Consuming the stream is what triggers the internal logic and the eventual throw.
+        }
+      }).rejects.toThrow(EmptyStreamError);
 
-    // Should be called 3 times (initial + 2 retries)
-    expect(mockModelsModule.generateContentStream).toHaveBeenCalledTimes(3);
+      // Should be called 3 times (initial + 2 retries)
+      expect(mockModelsModule.generateContentStream).toHaveBeenCalledTimes(3);
 
-    // History should be clean, as if the failed turn never happened.
-    const history = chat.getHistory();
-    expect(history.length).toBe(0);
-  });
+      // History should be clean, as if the failed turn never happened.
+      const history = chat.getHistory();
+      expect(history.length).toBe(0);
+    });
 });
