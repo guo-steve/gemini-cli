@@ -115,8 +115,7 @@ describe('GeminiChat', () => {
       const stream = await chat.sendMessageStream(
         { message: 'hello' },
         'prompt-id-1',
-      );
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      );      
       for await (const _ of stream) {
         // consume stream to trigger internal logic
       }
@@ -565,8 +564,7 @@ describe('GeminiChat', () => {
         'prompt-id-retry-fail',
       );
       await expect(async () => {
-        const stream = await streamPromise;
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const stream = await streamPromise;        
         for await (const _ of stream) {
           // Consuming the stream is what triggers the internal logic
         }
