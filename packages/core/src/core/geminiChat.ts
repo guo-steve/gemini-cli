@@ -336,28 +336,32 @@ export class GeminiChat {
           for await (const chunk of stream) {
             yield chunk;
           }
-          
+
           // If we finish the stream successfully, clear any errors and exit the loop.
           lastError = null;
           break;
-
         } catch (error) {
           lastError = error;
           const errorMessage = error instanceof Error ? error.message : '';
-
-        // Check for retryable conditions
+          // Check for retryable conditions
           const isRetryableNetworkError =
             errorMessage.includes('429') || errorMessage.match(/5\d{2}/);
           const isContentError = error instanceof EmptyStreamError;
 
           if (isRetryableNetworkError || isContentError) {
+            if (errorMessage.includes('429') && attempt === MAX_RETRIES) {
+              const authType =
+                self.config.getContentGeneratorConfig()?.authType;
+              await self.handleFlashFallback(authType, error);
+            }
+
             if (attempt < MAX_RETRIES) {
-            await new Promise((res) => setTimeout(res, 500 * (attempt + 1)));
-            continue; // Go to the next iteration of the loop.
+              await new Promise((res) => setTimeout(res, 500 * (attempt + 1)));
+              continue; // Go to the next iteration of the loop.
             }
           }
-          
-        // For non-retryable errors or if we've exhausted retries, break the loop.
+
+          // For non-retryable errors or if we've exhausted retries, break the loop.
           break;
         }
       }
@@ -378,32 +382,32 @@ export class GeminiChat {
     params: SendMessageParameters,
     prompt_id: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
-      const apiCall = () => {
-        const modelToUse = this.config.getModel();
+    const apiCall = () => {
+      const modelToUse = this.config.getModel();
 
-        if (
-          this.config.getQuotaErrorOccurred() &&
-          modelToUse === DEFAULT_GEMINI_FLASH_MODEL
-        ) {
-          throw new Error(
-            'Please submit a new query to continue with the Flash model.',
-          );
-        }
-
-        return this.contentGenerator.generateContentStream(
-          {
-            model: modelToUse,
-            contents: requestContents,
-            config: { ...this.generationConfig, ...params.config },
-          },
-          prompt_id,
+      if (
+        this.config.getQuotaErrorOccurred() &&
+        modelToUse === DEFAULT_GEMINI_FLASH_MODEL
+      ) {
+        throw new Error(
+          'Please submit a new query to continue with the Flash model.',
         );
-      };
-      
-      const streamResponse = await apiCall();
-      this.sendPromise = Promise.resolve();
+      }
 
-      return this.processStreamResponse(streamResponse);
+      return this.contentGenerator.generateContentStream(
+        {
+          model: modelToUse,
+          contents: requestContents,
+          config: { ...this.generationConfig, ...params.config },
+        },
+        prompt_id,
+      );
+    };
+
+    const streamResponse = await apiCall();
+    this.sendPromise = Promise.resolve();
+
+    return this.processStreamResponse(streamResponse);
   }
 
   /**
