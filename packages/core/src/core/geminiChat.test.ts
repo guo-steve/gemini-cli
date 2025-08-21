@@ -559,19 +559,18 @@ describe('GeminiChat', () => {
         invalidStream,
       );
 
-      // This helper function consumes the stream and allows us to test for rejection.
-      const consumeStream = async () => {
-        const stream = await chat.sendMessageStream(
-          { message: 'test' },
-          'prompt-id-retry-fail',
-        );
+      // FIX: The test must consume the async generator to trigger the error.
+      const streamPromise = chat.sendMessageStream(
+        { message: 'test' },
+        'prompt-id-retry-fail',
+      );
+      await expect(async () => {
+        const stream = await streamPromise;
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         for await (const _ of stream) {
-          // Must loop to trigger the internal logic that throws.
+          // Consuming the stream is what triggers the internal logic
         }
-      };
-
-      await expect(consumeStream()).rejects.toThrow(EmptyStreamError);
+      }).rejects.toThrow(EmptyStreamError);
 
       // Should be called 3 times (initial + 2 retries)
       expect(mockModelsModule.generateContentStream).toHaveBeenCalledTimes(3);
