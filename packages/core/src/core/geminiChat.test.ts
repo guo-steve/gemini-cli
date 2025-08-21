@@ -539,27 +539,27 @@ describe('GeminiChat', () => {
       // Check that history was not duplicated. User prompt + model response.
       const history = chat.getHistory();
       expect(history.length).toBe(2);
+      expect(history[1].role).toBe('model');
     });
 
     it('should fail after all retries on persistent invalid content', async () => {
-      // All calls will return an invalid stream
-      const invalidStream = (async function* () {
-        yield {
-          candidates: [
-            {
-              content: {
-                parts: [{ text: '' }],
-                role: 'model',
+      // FIX: Use mockImplementation to provide a NEW generator for each call.
+      vi.mocked(mockModelsModule.generateContentStream).mockImplementation(
+        async function* () {
+          yield {
+            candidates: [
+              {
+                content: {
+                  parts: [{ text: '' }],
+                  role: 'model',
+                },
               },
-            },
-          ],
-        } as unknown as GenerateContentResponse;
-      })();
-      vi.mocked(mockModelsModule.generateContentStream).mockResolvedValue(
-        invalidStream,
+            ],
+          } as unknown as GenerateContentResponse;
+        },
       );
 
-      // Helper function to consume the stream and test for rejection
+      // This helper function consumes the stream and allows us to test for rejection.
       const consumeStreamAndExpectError = async () => {
         const stream = await chat.sendMessageStream(
           { message: 'test' },
@@ -567,7 +567,7 @@ describe('GeminiChat', () => {
         );
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         for await (const _ of stream) {
-          // This loop must be executed to trigger the error.
+          // Must loop to trigger the internal logic that throws.
         }
       };
 
