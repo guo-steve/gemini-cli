@@ -319,94 +319,91 @@ export class GeminiChat {
     this.history.push(userContent);
     const requestContents = this.getHistory(true);
 
-    const MAX_RETRIES = 2;
-    let lastError: unknown = new Error('Request failed after all retries.');
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const self = this;
+    return (async function* () {
+      const MAX_RETRIES = 2;
+      let lastError: unknown = new Error('Request failed after all retries.');
 
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      try {
-        const stream = await this.makeApiCallAndYieldStream(
-          requestContents,
-          params,
-          prompt_id,
-        );
-        return stream; // If successful, return the generator and exit the loop.
-      } catch (error) {
-        lastError = error;
-        const errorMessage = error instanceof Error ? error.message : '';
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          const stream = await self.makeApiCallAndProcessStream(
+            requestContents,
+            params,
+            prompt_id,
+          );
+
+          for await (const chunk of stream) {
+            yield chunk;
+          }
+          
+          // If we finish the stream successfully, clear any errors and exit the loop.
+          lastError = null;
+          break;
+
+        } catch (error) {
+          lastError = error;
+          const errorMessage = error instanceof Error ? error.message : '';
 
         // Check for retryable conditions
-        const isRetryableNetworkError =
-          errorMessage.includes('429') || errorMessage.match(/5\d{2}/);
-        const isContentError = error instanceof EmptyStreamError;
+          const isRetryableNetworkError =
+            errorMessage.includes('429') || errorMessage.match(/5\d{2}/);
+          const isContentError = error instanceof EmptyStreamError;
 
-        if (isRetryableNetworkError || isContentError) {
-          if (attempt < MAX_RETRIES) {
+          if (isRetryableNetworkError || isContentError) {
+            if (attempt < MAX_RETRIES) {
             await new Promise((res) => setTimeout(res, 500 * (attempt + 1)));
             continue; // Go to the next iteration of the loop.
+            }
           }
-        }
-
+          
         // For non-retryable errors or if we've exhausted retries, break the loop.
-        break;
+          break;
+        }
       }
-    }
 
-    // If we've broken out of the loop due to an error, clean up history and re-throw.
-    if (this.history[this.history.length - 1] === userContent) {
-      this.history.pop();
-    }
-    this.sendPromise = Promise.resolve();
-    throw lastError;
+      if (lastError) {
+        // If the loop finished due to an error, clean up history and re-throw.
+        if (self.history[self.history.length - 1] === userContent) {
+          self.history.pop();
+        }
+        self.sendPromise = Promise.resolve();
+        throw lastError;
+      }
+    })();
   }
 
-  private async makeApiCallAndYieldStream(
+  private async makeApiCallAndProcessStream(
     requestContents: Content[],
     params: SendMessageParameters,
     prompt_id: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
-    const apiCall = () => {
-      const modelToUse = this.config.getModel();
+      const apiCall = () => {
+        const modelToUse = this.config.getModel();
 
-      if (
-        this.config.getQuotaErrorOccurred() &&
-        modelToUse === DEFAULT_GEMINI_FLASH_MODEL
-      ) {
-        throw new Error(
-          'Please submit a new query to continue with the Flash model.',
-        );
-      }
-
-      return this.contentGenerator.generateContentStream(
-        {
-          model: modelToUse,
-          contents: requestContents,
-          config: { ...this.generationConfig, ...params.config },
-        },
-        prompt_id,
-      );
-    };
-
-    // Note: Retrying streams can be complex. If generateContentStream itself doesn't handle retries
-    // for transient issues internally before yielding the async generator, this retry will re-initiate
-    // the stream. For simple 429/500 errors on initial call, this is fine.
-    // If errors occur mid-stream, this setup won't resume the stream; it will restart it.
-    const streamResponse = await retryWithBackoff(apiCall, {
-      shouldRetry: (error: unknown) => {
-        if (error instanceof Error && error.message) {
-          if (isSchemaDepthError(error.message)) return false;
-          if (error.message.includes('429')) return true;
-          if (error.message.match(/5\d{2}/)) return true;
+        if (
+          this.config.getQuotaErrorOccurred() &&
+          modelToUse === DEFAULT_GEMINI_FLASH_MODEL
+        ) {
+          throw new Error(
+            'Please submit a new query to continue with the Flash model.',
+          );
         }
-        return false;
-      },
-      onPersistent429: async (authType?: string, error?: unknown) =>
-        await this.handleFlashFallback(authType, error),
-      authType: this.config.getContentGeneratorConfig()?.authType,
-    });
 
-    this.sendPromise = Promise.resolve();
+        return this.contentGenerator.generateContentStream(
+          {
+            model: modelToUse,
+            contents: requestContents,
+            config: { ...this.generationConfig, ...params.config },
+          },
+          prompt_id,
+        );
+      };
+      
+      const streamResponse = await apiCall();
+      this.sendPromise = Promise.resolve();
 
-    return this.processStreamResponse(streamResponse);
+      return this.processStreamResponse(streamResponse);
   }
 
   /**
@@ -510,10 +507,11 @@ export class GeminiChat {
 
     // Now that the stream is finished, make a decision.
     if (isStreamInvalid) {
-      throw new EmptyStreamError('Model stream had invalid chunks');
+      throw new EmptyStreamError(
+        'Model stream was invalid or completed without valid content.',
+      );
     }
 
-    // If valid, add the fully assembled response to history.
     this.history.push({ role: 'model', parts: modelResponseParts });
   }
   private recordHistory(
