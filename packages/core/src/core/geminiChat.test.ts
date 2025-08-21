@@ -118,7 +118,7 @@ describe('GeminiChat', () => {
         'prompt-id-1',
       );
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      for await (const chunk of stream) {
+      for await (const _ of stream) {
         // consume
       }
 
@@ -560,6 +560,7 @@ describe('GeminiChat', () => {
         invalidStream,
       );
 
+      // FIX: The test must consume the async generator to trigger the error.
       const streamPromise = chat.sendMessageStream(
         { message: 'test' },
         'prompt-id-retry-fail',
@@ -567,7 +568,7 @@ describe('GeminiChat', () => {
       await expect(async () => {
         const stream = await streamPromise;
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        for await (const chunk of stream) {
+        for await (const _ of stream) {
           // Consuming the stream is what triggers the internal logic
         }
       }).rejects.toThrow(EmptyStreamError);
