@@ -112,14 +112,13 @@ describe('GeminiChat', () => {
         response,
       );
 
-      // FIX: The test must consume the stream for the internal logic to complete.
       const stream = await chat.sendMessageStream(
         { message: 'hello' },
         'prompt-id-1',
       );
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       for await (const _ of stream) {
-        // consume
+        // consume stream to trigger internal logic
       }
 
       expect(mockModelsModule.generateContentStream).toHaveBeenCalledWith(
@@ -537,7 +536,7 @@ describe('GeminiChat', () => {
         ),
       ).toBe(true);
 
-      // Check that history was not duplicated. First call adds 1 (user), second adds 1 (model).
+      // Check that history was not duplicated. User prompt + model response.
       const history = chat.getHistory();
       expect(history.length).toBe(2);
     });
@@ -560,18 +559,19 @@ describe('GeminiChat', () => {
         invalidStream,
       );
 
-      // FIX: The test must consume the async generator to trigger the error.
-      const streamPromise = chat.sendMessageStream(
-        { message: 'test' },
-        'prompt-id-retry-fail',
-      );
-      await expect(async () => {
-        const stream = await streamPromise;
+      // This helper function consumes the stream and allows us to test for rejection.
+      const consumeStream = async () => {
+        const stream = await chat.sendMessageStream(
+          { message: 'test' },
+          'prompt-id-retry-fail',
+        );
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         for await (const _ of stream) {
-          // Consuming the stream is what triggers the internal logic
+          // Must loop to trigger the internal logic that throws.
         }
-      }).rejects.toThrow(EmptyStreamError);
+      };
+
+      await expect(consumeStream()).rejects.toThrow(EmptyStreamError);
 
       // Should be called 3 times (initial + 2 retries)
       expect(mockModelsModule.generateContentStream).toHaveBeenCalledTimes(3);
@@ -581,45 +581,5 @@ describe('GeminiChat', () => {
       expect(history.length).toBe(0);
     });
   });
-
-  it('should fail after all retries on persistent invalid content', async () => {
-      // All calls will return an invalid stream
-      const invalidStream = (async function* () {
-        yield {
-          candidates: [
-            {
-              content: {
-                parts: [{ text: '' }],
-                role: 'model',
-              },
-            },
-          ],
-        } as unknown as GenerateContentResponse;
-      })();
-      vi.mocked(mockModelsModule.generateContentStream).mockResolvedValue(
-        invalidStream,
-      );
-
-      // FIX: The test must consume the async generator to trigger the error.
-      const streamPromise = chat.sendMessageStream(
-        { message: 'test' },
-        'prompt-id-retry-fail',
-      );
-      
-      // This is the correct way to test a generator that throws.
-      await expect(async () => {
-        const stream = await streamPromise;
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        for await (const _ of stream) {
-          // Consuming the stream is what triggers the internal logic and the eventual throw.
-        }
-      }).rejects.toThrow(EmptyStreamError);
-
-      // Should be called 3 times (initial + 2 retries)
-      expect(mockModelsModule.generateContentStream).toHaveBeenCalledTimes(3);
-
-      // History should be clean, as if the failed turn never happened.
-      const history = chat.getHistory();
-      expect(history.length).toBe(0);
-    });
 });
+
