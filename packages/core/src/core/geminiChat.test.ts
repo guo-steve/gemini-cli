@@ -116,7 +116,6 @@ describe('GeminiChat', () => {
         { message: 'hello' },
         'prompt-id-1',
       );
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       for await (const _ of stream) {
         // consume stream to trigger internal logic
       }
@@ -565,7 +564,6 @@ describe('GeminiChat', () => {
           { message: 'test' },
           'prompt-id-retry-fail',
         );
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         for await (const _ of stream) {
           // Must loop to trigger the internal logic that throws.
         }
