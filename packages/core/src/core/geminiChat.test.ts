@@ -12,7 +12,6 @@ import {
   Part,
   GenerateContentResponse,
 } from '@google/genai';
-// Add EmptyStreamError to the import list
 import { GeminiChat, EmptyStreamError } from './geminiChat.js';
 import { Config } from '../config/config.js';
 import { setSimulate429 } from '../utils/testUtils.js';
@@ -113,7 +112,15 @@ describe('GeminiChat', () => {
         response,
       );
 
-      await chat.sendMessageStream({ message: 'hello' }, 'prompt-id-1');
+      // FIX: The test must consume the stream for the internal logic to complete.
+      const stream = await chat.sendMessageStream(
+        { message: 'hello' },
+        'prompt-id-1',
+      );
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      for await (const chunk of stream) {
+        // consume
+      }
 
       expect(mockModelsModule.generateContentStream).toHaveBeenCalledWith(
         {
@@ -476,6 +483,7 @@ describe('GeminiChat', () => {
       expect(history[1]).toEqual(content2);
     });
   });
+
   describe('sendMessageStream with retries', () => {
     it('should retry on invalid content and succeed on the second attempt', async () => {
       // First call returns a stream with an invalid (empty) chunk
@@ -519,6 +527,7 @@ describe('GeminiChat', () => {
         chunks.push(chunk);
       }
 
+      // Assertions
       expect(mockModelsModule.generateContentStream).toHaveBeenCalledTimes(2);
       expect(
         chunks.some(
@@ -551,10 +560,17 @@ describe('GeminiChat', () => {
         invalidStream,
       );
 
-      // Assert that the call rejects with our specific error type
-      await expect(
-        chat.sendMessageStream({ message: 'test' }, 'prompt-id-retry-fail'),
-      ).rejects.toThrow(EmptyStreamError);
+      const streamPromise = chat.sendMessageStream(
+        { message: 'test' },
+        'prompt-id-retry-fail',
+      );
+      await expect(async () => {
+        const stream = await streamPromise;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        for await (const chunk of stream) {
+          // Consuming the stream is what triggers the internal logic
+        }
+      }).rejects.toThrow(EmptyStreamError);
 
       // Should be called 3 times (initial + 2 retries)
       expect(mockModelsModule.generateContentStream).toHaveBeenCalledTimes(3);
