@@ -561,15 +561,16 @@ describe('GeminiChat', () => {
       );
 
       // This helper function consumes the stream and allows us to test for rejection.
-      const consumeStreamAndExpectError = async () => {
+      async function consumeStreamAndExpectError() {
         const stream = await chat.sendMessageStream(
           { message: 'test' },
           'prompt-id-retry-fail',
         );
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         for await (const _ of stream) {
           // Must loop to trigger the internal logic that throws.
         }
-      };
+      }
 
       await expect(consumeStreamAndExpectError()).rejects.toThrow(
         EmptyStreamError,
