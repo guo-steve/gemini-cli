@@ -484,37 +484,26 @@ describe('GeminiChat', () => {
 
   describe('sendMessageStream with retries', () => {
     it('should retry on invalid content and succeed on the second attempt', async () => {
-      // First call returns a stream with an invalid (empty) chunk
-      const invalidStream = (async function* () {
-        yield {
-          candidates: [
-            {
-              content: {
-                parts: [{ text: '' }], // Invalid empty text part
-                role: 'model',
-              },
-            },
-          ],
-        } as unknown as GenerateContentResponse;
-      })();
-
-      // Second call returns a valid stream
-      const validStream = (async function* () {
-        yield {
-          candidates: [
-            {
-              content: {
-                parts: [{ text: 'Successful response' }],
-                role: 'model',
-              },
-            },
-          ],
-        } as unknown as GenerateContentResponse;
-      })();
-
+      // Use mockImplementationOnce to provide a fresh, promise-wrapped generator for each attempt.
       vi.mocked(mockModelsModule.generateContentStream)
-        .mockResolvedValueOnce(invalidStream)
-        .mockResolvedValueOnce(validStream);
+        .mockImplementationOnce(async () =>
+          // First call returns an invalid stream
+          (async function* () {
+            yield {
+              candidates: [{ content: { parts: [{ text: '' }] } }], // Invalid empty text part
+            } as unknown as GenerateContentResponse;
+          })(),
+        )
+        .mockImplementationOnce(async () =>
+          // Second call returns a valid stream
+          (async function* () {
+            yield {
+              candidates: [
+                { content: { parts: [{ text: 'Successful response' }] } },
+              ],
+            } as unknown as GenerateContentResponse;
+          })(),
+        );
 
       const stream = await chat.sendMessageStream(
         { message: 'test' },
@@ -535,14 +524,20 @@ describe('GeminiChat', () => {
         ),
       ).toBe(true);
 
-      // Check that history was not duplicated. User prompt + model response.
+      // Check that history was recorded correctly once, with no duplicates.
       const history = chat.getHistory();
       expect(history.length).toBe(2);
-      expect(history[1].role).toBe('model');
+      expect(history[0]).toEqual({
+        role: 'user',
+        parts: [{ text: 'test' }],
+      });
+      expect(history[1]).toEqual({
+        role: 'model',
+        parts: [{ text: 'Successful response' }],
+      });
     });
 
     it('should fail after all retries on persistent invalid content', async () => {
-      // FIX: Wrap the async generator in an async function to return a Promise.
       vi.mocked(mockModelsModule.generateContentStream).mockImplementation(
         async () =>
           (async function* () {

@@ -331,19 +331,18 @@ export class GeminiChat {
             requestContents,
             params,
             prompt_id,
+            userContent,
           );
 
           for await (const chunk of stream) {
             yield chunk;
           }
 
-          // If we finish the stream successfully, clear any errors and exit the loop.
           lastError = null;
           break;
         } catch (error) {
           lastError = error;
           const errorMessage = error instanceof Error ? error.message : '';
-          // Check for retryable conditions
           const isRetryableNetworkError =
             errorMessage.includes('429') || errorMessage.match(/5\d{2}/);
           const isContentError = error instanceof EmptyStreamError;
@@ -357,17 +356,16 @@ export class GeminiChat {
 
             if (attempt < MAX_RETRIES) {
               await new Promise((res) => setTimeout(res, 500 * (attempt + 1)));
-              continue; // Go to the next iteration of the loop.
+              continue;
             }
           }
-
-          // For non-retryable errors or if we've exhausted retries, break the loop.
           break;
         }
       }
 
       if (lastError) {
-        // If the loop finished due to an error, clean up history and re-throw.
+        // If the stream fails, remove the user message that was added.
+        // TODO: get rid of this.
         if (self.history[self.history.length - 1] === userContent) {
           self.history.pop();
         }
@@ -381,6 +379,7 @@ export class GeminiChat {
     requestContents: Content[],
     params: SendMessageParameters,
     prompt_id: string,
+    userContent: Content,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     const apiCall = () => {
       const modelToUse = this.config.getModel();
@@ -407,7 +406,7 @@ export class GeminiChat {
     const streamResponse = await apiCall();
     this.sendPromise = Promise.resolve();
 
-    return this.processStreamResponse(streamResponse);
+    return this.processStreamResponse(streamResponse, userContent);
   }
 
   /**
@@ -532,84 +531,61 @@ export class GeminiChat {
     modelOutput: Content[],
     automaticFunctionCallingHistory?: Content[],
   ) {
+    const newHistoryEntries: Content[] = [];
+
+    // Part 1: Determine the user's contribution for this turn.
+    if (
+      automaticFunctionCallingHistory &&
+      automaticFunctionCallingHistory.length > 0
+    ) {
+      newHistoryEntries.push(
+        ...extractCuratedHistory(automaticFunctionCallingHistory),
+      );
+    } else {
+      // FIX: Only add the user input if it's not already the last item in the history.
+      // This handles the discrepancy between the streaming and non-streaming methods.
+      if (this.history[this.history.length - 1] !== userInput) {
+        newHistoryEntries.push(userInput);
+      }
+    }
+
+    // Part 2: Determine the model's contribution, filtering out thoughts.
     const nonThoughtModelOutput = modelOutput.filter(
       (content) => !this.isThoughtContent(content),
     );
 
     let outputContents: Content[] = [];
-    if (
-      nonThoughtModelOutput.length > 0 &&
-      nonThoughtModelOutput.every((content) => content.role !== undefined)
-    ) {
+    if (nonThoughtModelOutput.length > 0) {
       outputContents = nonThoughtModelOutput;
-    } else if (nonThoughtModelOutput.length === 0 && modelOutput.length > 0) {
-      // This case handles when the model returns only a thought.
-      // We don't want to add an empty model response in this case.
-    } else {
-      // When not a function response appends an empty content when model returns empty response, so that the
-      // history is always alternating between user and model.
-      // Workaround for: https://b.corp.google.com/issues/420354090
-      if (!isFunctionResponse(userInput)) {
-        outputContents.push({
-          role: 'model',
-          parts: [],
-        } as Content);
-      }
-    }
-    if (
-      automaticFunctionCallingHistory &&
-      automaticFunctionCallingHistory.length > 0
+    } else if (
+      modelOutput.length === 0 &&
+      !isFunctionResponse(userInput) &&
+      (!automaticFunctionCallingHistory ||
+        automaticFunctionCallingHistory.length === 0)
     ) {
-      this.history.push(
-        ...extractCuratedHistory(automaticFunctionCallingHistory),
-      );
-    } else {
-      this.history.push(userInput);
+      outputContents.push({ role: 'model', parts: [] } as Content);
     }
 
-    // Consolidate adjacent model roles in outputContents
+    // Part 3: Consolidate the model's output parts.
     const consolidatedOutputContents: Content[] = [];
-    for (const content of outputContents) {
-      if (this.isThoughtContent(content)) {
-        continue;
-      }
-      const lastContent =
-        consolidatedOutputContents[consolidatedOutputContents.length - 1];
-      if (this.isTextContent(lastContent) && this.isTextContent(content)) {
-        // If both current and last are text, combine their text into the lastContent's first part
-        // and append any other parts from the current content.
-        lastContent.parts[0].text += content.parts[0].text || '';
-        if (content.parts.length > 1) {
-          lastContent.parts.push(...content.parts.slice(1));
+    if (outputContents.length > 0) {
+      for (const content of outputContents) {
+        const lastContent =
+          consolidatedOutputContents[consolidatedOutputContents.length - 1];
+        if (this.isTextContent(lastContent) && this.isTextContent(content)) {
+          lastContent.parts[0].text += content.parts[0].text || '';
+          if (content.parts.length > 1) {
+            lastContent.parts.push(...content.parts.slice(1));
+          }
+        } else {
+          consolidatedOutputContents.push(content);
         }
-      } else {
-        consolidatedOutputContents.push(content);
       }
     }
 
-    if (consolidatedOutputContents.length > 0) {
-      const lastHistoryEntry = this.history[this.history.length - 1];
-      const canMergeWithLastHistory =
-        !automaticFunctionCallingHistory ||
-        automaticFunctionCallingHistory.length === 0;
-
-      if (
-        canMergeWithLastHistory &&
-        this.isTextContent(lastHistoryEntry) &&
-        this.isTextContent(consolidatedOutputContents[0])
-      ) {
-        // If both current and last are text, combine their text into the lastHistoryEntry's first part
-        // and append any other parts from the current content.
-        lastHistoryEntry.parts[0].text +=
-          consolidatedOutputContents[0].parts[0].text || '';
-        if (consolidatedOutputContents[0].parts.length > 1) {
-          lastHistoryEntry.parts.push(
-            ...consolidatedOutputContents[0].parts.slice(1),
-          );
-        }
-        consolidatedOutputContents.shift(); // Remove the first element as it's merged
-      }
-      this.history.push(...consolidatedOutputContents);
+    // Part 4: Add all new entries to the main history at once.
+    if (newHistoryEntries.length > 0 || consolidatedOutputContents.length > 0) {
+      this.history.push(...newHistoryEntries, ...consolidatedOutputContents);
     }
   }
 
