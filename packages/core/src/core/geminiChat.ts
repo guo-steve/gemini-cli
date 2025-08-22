@@ -526,7 +526,7 @@ export class GeminiChat {
     ];
     this.recordHistory(userInput, modelOutput);
   }
-  
+
   private recordHistory(
     userInput: Content,
     modelOutput: Content[],
