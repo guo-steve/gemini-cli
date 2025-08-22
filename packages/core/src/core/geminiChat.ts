@@ -493,6 +493,7 @@ export class GeminiChat {
 
   private async *processStreamResponse(
     streamResponse: AsyncGenerator<GenerateContentResponse>,
+    userInput: Content,
   ): AsyncGenerator<GenerateContentResponse> {
     const modelResponseParts: Part[] = [];
     let isStreamInvalid = false;
@@ -500,13 +501,16 @@ export class GeminiChat {
     for await (const chunk of streamResponse) {
       if (isValidResponse(chunk)) {
         const content = chunk.candidates?.[0]?.content;
-        if (content?.parts) {
-          modelResponseParts.push(...content.parts);
+        if (content) {
+          // Filter out thought parts from being added to history.
+          if (!this.isThoughtContent(content) && content.parts) {
+            modelResponseParts.push(...content.parts);
+          }
         }
       } else {
         isStreamInvalid = true;
       }
-      yield chunk; // Yield to the UI immediately.
+      yield chunk; // Yield every chunk to the UI immediately.
     }
 
     // Now that the stream is finished, make a decision.
@@ -516,8 +520,13 @@ export class GeminiChat {
       );
     }
 
-    this.history.push({ role: 'model', parts: modelResponseParts });
+    // Use recordHistory to correctly save the conversation turn.
+    const modelOutput: Content[] = [
+      { role: 'model', parts: modelResponseParts },
+    ];
+    this.recordHistory(userInput, modelOutput);
   }
+  
   private recordHistory(
     userInput: Content,
     modelOutput: Content[],
