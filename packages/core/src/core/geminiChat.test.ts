@@ -542,19 +542,21 @@ describe('GeminiChat', () => {
     });
 
     it('should fail after all retries on persistent invalid content', async () => {
-      // FIX: Use mockImplementation to provide a NEW generator for each call.
+      // FIX: Wrap the async generator in an async function to return a Promise.
       vi.mocked(mockModelsModule.generateContentStream).mockImplementation(
-        async function* () {
-          yield {
-            candidates: [
-              {
-                content: {
-                  parts: [{ text: '' }],
-                  role: 'model',
+        async () => {
+          return (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: {
+                    parts: [{ text: '' }],
+                    role: 'model',
+                  },
                 },
-              },
-            ],
-          } as unknown as GenerateContentResponse;
+              ],
+            } as unknown as GenerateContentResponse;
+          })();
         },
       );
 
