@@ -342,18 +342,9 @@ export class GeminiChat {
           break;
         } catch (error) {
           lastError = error;
-          const errorMessage = error instanceof Error ? error.message : '';
-          const isRetryableNetworkError =
-            errorMessage.includes('429') || errorMessage.match(/5\d{2}/);
           const isContentError = error instanceof EmptyStreamError;
 
-          if (isRetryableNetworkError || isContentError) {
-            if (errorMessage.includes('429') && attempt === MAX_RETRIES) {
-              const authType =
-                self.config.getContentGeneratorConfig()?.authType;
-              await self.handleFlashFallback(authType, error);
-            }
-
+          if (isContentError) {
             if (attempt < MAX_RETRIES) {
               await new Promise((res) => setTimeout(res, 500 * (attempt + 1)));
               continue;

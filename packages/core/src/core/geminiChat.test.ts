@@ -578,45 +578,70 @@ describe('GeminiChat', () => {
     });
   });
   it('should correctly retry and append to an existing history mid-conversation', async () => {
-    // 1. Setup: Prime the chat instance with a pre-existing conversation.
-    const initialHistory: Content[] = [
-      { role: 'user', parts: [{ text: 'First question' }] },
-      { role: 'model', parts: [{ text: 'First answer' }] },
-    ];
-    chat.setHistory(initialHistory);
+      // 1. Setup
+      const initialHistory: Content[] = [
+        { role: 'user', parts: [{ text: 'First question' }] },
+        { role: 'model', parts: [{ text: 'First answer' }] },
+      ];
+      chat.setHistory(initialHistory);
 
-    // 2. Mock the API to fail once (empty content), then succeed.
-    vi.mocked(mockModelsModule.generateContentStream)
-      .mockImplementationOnce(async () =>
-        (async function* () {
-          yield {
-            candidates: [{ content: { parts: [{ text: '' }] } }],
-          } as unknown as GenerateContentResponse;
-        })(),
-      )
-      .mockImplementationOnce(async () =>
-        (async function* () {
-          yield {
-            candidates: [{ content: { parts: [{ text: 'Second answer' }] } }],
-          } as unknown as GenerateContentResponse;
-        })(),
+      // 2. Mock the API
+      vi.mocked(mockModelsModule.generateContentStream)
+        .mockImplementationOnce(
+          async () =>
+            (async function* () {
+              yield {
+                candidates: [{ content: { parts: [{ text: '' }] } }],
+              } as unknown as GenerateContentResponse;
+            })(),
+        )
+        .mockImplementationOnce(
+          async () =>
+            (async function* () {
+              yield {
+                candidates: [
+                  { content: { parts: [{ text: 'Second answer' }] } },
+                ],
+              } as unknown as GenerateContentResponse;
+            })(),
+        );
+
+      // 3. Send a new message
+      const stream = await chat.sendMessageStream(
+        { message: 'Second question' },
+        'prompt-id-retry-existing',
       );
+      for await (const _ of stream) {
+        // consume stream
+      }
 
-    // 3. Send a new message, triggering the retry flow.
-    const stream = await chat.sendMessageStream(
-      { message: 'Second question' },
-      'prompt-id-retry-existing',
-    );
-    for await (const _ of stream) {
-      // consume stream
-    }
+      // 4. Assert the final history
+      const history = chat.getHistory();
+      expect(history.length).toBe(4);
 
-    // 4. Assert the final history is complete and in the correct order.
-    const history = chat.getHistory();
-    expect(history.length).toBe(4); // Initial 2 turns + the new 2 turns
-    expect(history[0]?.parts[0]?.text).toBe('First question');
-    expect(history[1]?.parts[0]?.text).toBe('First answer');
-    expect(history[2]?.parts[0]?.text).toBe('Second question');
-    expect(history[3]?.parts[0]?.text).toBe('Second answer');
-  });
+      // Explicitly verify the structure of each part to satisfy TypeScript
+      const turn1 = history[0];
+      if (!turn1?.parts?.[0] || !('text' in turn1.parts[0])) {
+        throw new Error('Test setup error: First turn is not a valid text part.');
+      }
+      expect(turn1.parts[0].text).toBe('First question');
+
+      const turn2 = history[1];
+      if (!turn2?.parts?.[0] || !('text' in turn2.parts[0])) {
+        throw new Error('Test setup error: Second turn is not a valid text part.');
+      }
+      expect(turn2.parts[0].text).toBe('First answer');
+
+      const turn3 = history[2];
+      if (!turn3?.parts?.[0] || !('text' in turn3.parts[0])) {
+        throw new Error('Test setup error: Third turn is not a valid text part.');
+      }
+      expect(turn3.parts[0].text).toBe('Second question');
+
+      const turn4 = history[3];
+      if (!turn4?.parts?.[0] || !('text' in turn4.parts[0])) {
+        throw new Error('Test setup error: Fourth turn is not a valid text part.');
+      }
+      expect(turn4.parts[0].text).toBe('Second answer');
+    });
 });
