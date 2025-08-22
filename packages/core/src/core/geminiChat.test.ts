@@ -544,8 +544,8 @@ describe('GeminiChat', () => {
     it('should fail after all retries on persistent invalid content', async () => {
       // FIX: Wrap the async generator in an async function to return a Promise.
       vi.mocked(mockModelsModule.generateContentStream).mockImplementation(
-        async () => {
-          return (async function* () {
+        async () =>
+          (async function* () {
             yield {
               candidates: [
                 {
@@ -556,8 +556,7 @@ describe('GeminiChat', () => {
                 },
               ],
             } as unknown as GenerateContentResponse;
-          })();
-        },
+          })(),
       );
 
       // This helper function consumes the stream and allows us to test for rejection.
@@ -566,7 +565,6 @@ describe('GeminiChat', () => {
           { message: 'test' },
           'prompt-id-retry-fail',
         );
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         for await (const _ of stream) {
           // Must loop to trigger the internal logic that throws.
         }
