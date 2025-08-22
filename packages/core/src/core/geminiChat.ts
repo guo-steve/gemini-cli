@@ -403,7 +403,19 @@ export class GeminiChat {
       );
     };
 
-    const streamResponse = await apiCall();
+    const streamResponse = await retryWithBackoff(apiCall, {
+      shouldRetry: (error: unknown) => {
+        if (error instanceof Error && error.message) {
+          if (error.message.includes('429')) return true;
+          if (error.message.match(/5\d{2}/)) return true;
+        }
+        return false;
+      },
+      onPersistent429: async (authType?: string, error?: unknown) =>
+        await this.handleFlashFallback(authType, error),
+      authType: this.config.getContentGeneratorConfig()?.authType,
+    });
+
     this.sendPromise = Promise.resolve();
 
     return this.processStreamResponse(streamResponse, userContent);
@@ -533,7 +545,7 @@ export class GeminiChat {
   ) {
     const newHistoryEntries: Content[] = [];
 
-    // Part 1: Determine the user's contribution for this turn.
+    // Part 1: Handle the user's part of the turn.
     if (
       automaticFunctionCallingHistory &&
       automaticFunctionCallingHistory.length > 0
@@ -542,14 +554,16 @@ export class GeminiChat {
         ...extractCuratedHistory(automaticFunctionCallingHistory),
       );
     } else {
-      // FIX: Only add the user input if it's not already the last item in the history.
-      // This handles the discrepancy between the streaming and non-streaming methods.
-      if (this.history[this.history.length - 1] !== userInput) {
+      // Guard for streaming calls where the user input might already be in the history.
+      if (
+        this.history.length === 0 ||
+        this.history[this.history.length - 1] !== userInput
+      ) {
         newHistoryEntries.push(userInput);
       }
     }
 
-    // Part 2: Determine the model's contribution, filtering out thoughts.
+    // Part 2: Handle the model's part of the turn, filtering out thoughts.
     const nonThoughtModelOutput = modelOutput.filter(
       (content) => !this.isThoughtContent(content),
     );
@@ -560,13 +574,13 @@ export class GeminiChat {
     } else if (
       modelOutput.length === 0 &&
       !isFunctionResponse(userInput) &&
-      (!automaticFunctionCallingHistory ||
-        automaticFunctionCallingHistory.length === 0)
+      !automaticFunctionCallingHistory
     ) {
+      // Add an empty model response if the model truly returned nothing.
       outputContents.push({ role: 'model', parts: [] } as Content);
     }
 
-    // Part 3: Consolidate the model's output parts.
+    // Part 3: Consolidate the parts of this turn's model response.
     const consolidatedOutputContents: Content[] = [];
     if (outputContents.length > 0) {
       for (const content of outputContents) {
@@ -583,10 +597,8 @@ export class GeminiChat {
       }
     }
 
-    // Part 4: Add all new entries to the main history at once.
-    if (newHistoryEntries.length > 0 || consolidatedOutputContents.length > 0) {
-      this.history.push(...newHistoryEntries, ...consolidatedOutputContents);
-    }
+    // Part 4: Add the new turn (user and model parts) to the main history.
+    this.history.push(...newHistoryEntries, ...consolidatedOutputContents);
   }
 
   private isTextContent(
