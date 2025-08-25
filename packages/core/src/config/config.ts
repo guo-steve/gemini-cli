@@ -130,7 +130,7 @@ export class MCPServerConfig {
     // OAuth configuration
     readonly oauth?: MCPOAuthConfig,
     readonly authProviderType?: AuthProviderType,
-  ) {}
+  ) { }
 }
 
 export enum AuthProviderType {
@@ -367,6 +367,8 @@ export class Config {
     if (this.geminiClient && this.geminiClient.isInitialized()) {
       existingHistory = this.geminiClient.getHistory();
     }
+
+    console.error('xxx: ', this.model);
 
     // Create new content generator config
     const newContentGeneratorConfig = createContentGeneratorConfig(

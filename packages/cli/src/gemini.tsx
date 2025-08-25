@@ -117,13 +117,12 @@ export function setupUnhandledRejectionHandler() {
 This is an unexpected error. Please file a bug report using the /bug tool.
 CRITICAL: Unhandled Promise Rejection!
 =========================================
-Reason: ${reason}${
-      reason instanceof Error && reason.stack
+Reason: ${reason}${reason instanceof Error && reason.stack
         ? `
 Stack trace:
 ${reason.stack}`
         : ''
-    }`;
+      }`;
     appEvents.emit(AppEvent.LogError, errorMessage);
     if (!unhandledRejectionOccurred) {
       unhandledRejectionOccurred = true;
@@ -263,6 +262,8 @@ export async function main() {
     return runZedIntegration(config, settings, extensions, argv);
   }
 
+  console.log("xxx: ok")
+
   let input = config.getQuestion();
   const startupWarnings = [
     ...(await getStartupWarnings()),
@@ -275,6 +276,7 @@ export async function main() {
     // Detect and enable Kitty keyboard protocol once at startup
     await detectAndEnableKittyProtocol();
     setWindowTitle(basename(workspaceRoot), settings);
+    console.log("xxx: before render")
     const instance = render(
       <React.StrictMode>
         <SettingsContext.Provider value={settings}>
@@ -288,6 +290,7 @@ export async function main() {
       </React.StrictMode>,
       { exitOnCtrlC: false },
     );
+    console.log("xxx: after render")
 
     checkForUpdates()
       .then((info) => {
@@ -303,6 +306,8 @@ export async function main() {
     registerCleanup(() => instance.unmount());
     return;
   }
+
+  console.log("xxx: after UI")
   // If not a TTY, read from stdin
   // This is for cases where the user pipes input directly into the command
   if (!process.stdin.isTTY) {
@@ -325,6 +330,8 @@ export async function main() {
     auth_type: config.getContentGeneratorConfig()?.authType,
     prompt_length: input.length,
   });
+
+  console.log(`\nPrompt ID: ${prompt_id}`);
 
   const nonInteractiveConfig = await validateNonInteractiveAuth(
     settings.merged.selectedAuthType,

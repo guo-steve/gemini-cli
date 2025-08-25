@@ -24,7 +24,7 @@ import {
   UnauthorizedError,
   toFriendlyError,
 } from '../utils/errors.js';
-import { GeminiChat } from './geminiChat.js';
+import { ChatInterface } from './chatInterface.js';
 
 // Define a structure for tools passed to the server
 export interface ServerTool {
@@ -168,7 +168,7 @@ export class Turn {
   finishReason: FinishReason | undefined;
 
   constructor(
-    private readonly chat: GeminiChat,
+    private readonly chat: ChatInterface,
     private readonly prompt_id: string,
   ) {
     this.pendingToolCalls = [];
@@ -266,9 +266,9 @@ export class Turn {
       );
       const status =
         typeof error === 'object' &&
-        error !== null &&
-        'status' in error &&
-        typeof (error as { status: unknown }).status === 'number'
+          error !== null &&
+          'status' in error &&
+          typeof (error as { status: unknown }).status === 'number'
           ? (error as { status: number }).status
           : undefined;
       const structuredError: StructuredError = {

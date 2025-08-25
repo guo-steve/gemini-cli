@@ -9,7 +9,6 @@ import { WritableStream, ReadableStream } from 'node:stream/web';
 import {
   AuthType,
   Config,
-  GeminiChat,
   ToolRegistry,
   logToolCall,
   ToolResult,
@@ -34,6 +33,7 @@ import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { Extension } from '../config/extension.js';
 import { CliArgs, loadCliConfig } from '../config/config.js';
+import { ChatInterface } from '@google/gemini-cli-core/src/core/chatInterface.js';
 
 export async function runZedIntegration(
   config: Config,
@@ -67,7 +67,7 @@ class GeminiAgent {
     private extensions: Extension[],
     private argv: CliArgs,
     private client: acp.Client,
-  ) {}
+  ) { }
 
   async initialize(
     _args: acp.InitializeRequest,
@@ -190,10 +190,10 @@ class Session {
 
   constructor(
     private readonly id: string,
-    private readonly chat: GeminiChat,
+    private readonly chat: ChatInterface,
     private readonly config: Config,
     private readonly client: acp.Client,
-  ) {}
+  ) { }
 
   async cancelPendingPrompt(): Promise<void> {
     if (!this.pendingPrompt) {
@@ -391,8 +391,8 @@ class Session {
         output.outcome.outcome === 'cancelled'
           ? ToolConfirmationOutcome.Cancel
           : z
-              .nativeEnum(ToolConfirmationOutcome)
-              .parse(output.outcome.optionId);
+            .nativeEnum(ToolConfirmationOutcome)
+            .parse(output.outcome.optionId);
 
       await confirmationDetails.onConfirm(outcome);
 

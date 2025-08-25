@@ -29,6 +29,7 @@ import { getResponseText } from '../utils/generateContentResponseUtilities.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
 import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat } from './geminiChat.js';
+import { DeepseekChat } from './deepseekChat.js';
 import { retryWithBackoff } from '../utils/retry.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
@@ -54,9 +55,11 @@ import {
 } from '../telemetry/types.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 import { IdeContext, File } from '../ide/ideContext.js';
+import { ChatInterface } from './chatInterface.js';
 
 function isThinkingSupported(model: string) {
   if (model.startsWith('gemini-2.5')) return true;
+  if (model.startsWith('deepseek')) return true;
   return false;
 }
 
@@ -108,7 +111,7 @@ const COMPRESSION_TOKEN_THRESHOLD = 0.7;
 const COMPRESSION_PRESERVE_THRESHOLD = 0.3;
 
 export class GeminiClient {
-  private chat?: GeminiChat;
+  private chat?: ChatInterface;
   private contentGenerator?: ContentGenerator;
   private embeddingModel: string;
   private generateContentConfig: GenerateContentConfig = {
@@ -156,7 +159,7 @@ export class GeminiClient {
     this.getChat().addHistory(content);
   }
 
-  getChat(): GeminiChat {
+  getChat(): ChatInterface {
     if (!this.chat) {
       throw new Error('Chat not initialized');
     }
@@ -177,24 +180,24 @@ export class GeminiClient {
   ) {
     const historyToSet = stripThoughts
       ? history.map((content) => {
-          const newContent = { ...content };
-          if (newContent.parts) {
-            newContent.parts = newContent.parts.map((part) => {
-              if (
-                part &&
-                typeof part === 'object' &&
-                'thoughtSignature' in part
-              ) {
-                const newPart = { ...part };
-                delete (newPart as { thoughtSignature?: string })
-                  .thoughtSignature;
-                return newPart;
-              }
-              return part;
-            });
-          }
-          return newContent;
-        })
+        const newContent = { ...content };
+        if (newContent.parts) {
+          newContent.parts = newContent.parts.map((part) => {
+            if (
+              part &&
+              typeof part === 'object' &&
+              'thoughtSignature' in part
+            ) {
+              const newPart = { ...part };
+              delete (newPart as { thoughtSignature?: string })
+                .thoughtSignature;
+              return newPart;
+            }
+            return part;
+          });
+        }
+        return newContent;
+      })
       : history;
     this.getChat().setHistory(historyToSet);
     this.forceFullIdeContext = true;
@@ -222,7 +225,7 @@ export class GeminiClient {
     });
   }
 
-  async startChat(extraHistory?: Content[]): Promise<GeminiChat> {
+  async startChat(extraHistory?: Content[]): Promise<ChatInterface> {
     this.forceFullIdeContext = true;
     const envParts = await getEnvironmentContext(this.config);
     const toolRegistry = await this.config.getToolRegistry();
@@ -246,22 +249,36 @@ export class GeminiClient {
         this.config.getModel(),
       )
         ? {
-            ...this.generateContentConfig,
-            thinkingConfig: {
-              includeThoughts: true,
-            },
-          }
+          ...this.generateContentConfig,
+          thinkingConfig: {
+            includeThoughts: true,
+          },
+        }
         : this.generateContentConfig;
-      return new GeminiChat(
-        this.config,
-        this.getContentGenerator(),
-        {
-          systemInstruction,
-          ...generateContentConfigWithThinking,
-          tools,
-        },
-        history,
-      );
+
+      if (this.config.getModel().startsWith('deepseek')) {
+        return new DeepseekChat(
+          this.config,
+          this.getContentGenerator(),
+          {
+            systemInstruction,
+            ...generateContentConfigWithThinking,
+            tools,
+          },
+          history,
+        );
+      } else {
+        return new GeminiChat(
+          this.config,
+          this.getContentGenerator(),
+          {
+            systemInstruction,
+            ...generateContentConfigWithThinking,
+            tools,
+          },
+          history,
+        );
+      }
     } catch (error) {
       await reportError(
         error,
@@ -297,9 +314,9 @@ export class GeminiClient {
           path: activeFile.path,
           cursor: activeFile.cursor
             ? {
-                line: activeFile.cursor.line,
-                character: activeFile.cursor.character,
-              }
+              line: activeFile.cursor.line,
+              character: activeFile.cursor.character,
+            }
             : undefined,
           selectedText: activeFile.selectedText || undefined,
         };
@@ -378,9 +395,9 @@ export class GeminiClient {
             path: currentActiveFile.path,
             cursor: currentActiveFile.cursor
               ? {
-                  line: currentActiveFile.cursor.line,
-                  character: currentActiveFile.cursor.character,
-                }
+                line: currentActiveFile.cursor.line,
+                character: currentActiveFile.cursor.character,
+              }
               : undefined,
             selectedText: currentActiveFile.selectedText || undefined,
           };
@@ -468,6 +485,8 @@ export class GeminiClient {
 
     // Track the original model from the first call to detect model switching
     const initialModel = originalModel || this.config.getModel();
+
+    console.error('xxx: %s', initialModel);
 
     const compressed = await this.tryCompressChat(prompt_id);
 
