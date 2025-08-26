@@ -16,9 +16,11 @@ import {
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import { DEFAULT_DEEPSEEK_CHAT_MODEL } from '../config/models.js';
 import { Config } from '../config/config.js';
+import OpenAI from 'openai';
 
 import { UserTierId } from '../code_assist/types.js';
 import { LoggingContentGenerator } from './loggingContentGenerator.js';
+import { DeepSeekContentGenerator } from './deepseekContentGenerator.js';
 import { getInstallationId } from '../utils/user_id.js';
 
 /**
@@ -47,6 +49,7 @@ export enum AuthType {
   USE_GEMINI = 'gemini-api-key',
   USE_VERTEX_AI = 'vertex-ai',
   CLOUD_SHELL = 'cloud-shell',
+  USE_DEEPSEEK = 'deepseek-api-key',
 }
 
 export type ContentGeneratorConfig = {
@@ -63,6 +66,7 @@ export function createContentGeneratorConfig(
 ): ContentGeneratorConfig {
   const geminiApiKey = process.env['GEMINI_API_KEY'] || undefined;
   const googleApiKey = process.env['GOOGLE_API_KEY'] || undefined;
+  const deepseekApiKey = process.env['DEEPSEEK_API_KEY'] || undefined;
   const googleCloudProject = process.env['GOOGLE_CLOUD_PROJECT'] || undefined;
   const googleCloudLocation = process.env['GOOGLE_CLOUD_LOCATION'] || undefined;
 
@@ -100,6 +104,13 @@ export function createContentGeneratorConfig(
     return contentGeneratorConfig;
   }
 
+  if (authType === AuthType.USE_DEEPSEEK && deepseekApiKey) {
+    contentGeneratorConfig.apiKey = deepseekApiKey;
+    contentGeneratorConfig.vertexai = false;
+
+    return contentGeneratorConfig;
+  }
+
   return contentGeneratorConfig;
 }
 
@@ -113,6 +124,8 @@ export async function createContentGenerator(
   const baseHeaders: Record<string, string> = {
     'User-Agent': userAgent,
   };
+
+  console.error('xxx', config.authType)
 
   if (
     config.authType === AuthType.LOGIN_WITH_GOOGLE ||
@@ -151,6 +164,16 @@ export async function createContentGenerator(
     });
     return new LoggingContentGenerator(googleGenAI.models, gcConfig);
   }
+
+  if (config.authType === AuthType.USE_DEEPSEEK) {
+    const openai = new OpenAI({
+      baseURL: 'https://api.deepseek.com',
+      apiKey: config.apiKey || '',
+    });
+    const deepseekGenerator = new DeepSeekContentGenerator(openai, config.model);
+    return new LoggingContentGenerator(deepseekGenerator, gcConfig);
+  }
+
   throw new Error(
     `Error creating contentGenerator: Unsupported authType: ${config.authType}`,
   );

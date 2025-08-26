@@ -222,6 +222,8 @@ export class GeminiChat {
           );
         }
 
+        console.error('xxx', this.contentGenerator.constructor.name);
+
         return this.contentGenerator.generateContent(
           {
             model: modelToUse,

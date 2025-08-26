@@ -368,8 +368,6 @@ export class Config {
       existingHistory = this.geminiClient.getHistory();
     }
 
-    console.error('xxx: ', this.model);
-
     // Create new content generator config
     const newContentGeneratorConfig = createContentGeneratorConfig(
       this,

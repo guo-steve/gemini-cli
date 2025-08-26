@@ -262,8 +262,6 @@ export async function main() {
     return runZedIntegration(config, settings, extensions, argv);
   }
 
-  console.log("xxx: ok")
-
   let input = config.getQuestion();
   const startupWarnings = [
     ...(await getStartupWarnings()),
@@ -276,7 +274,6 @@ export async function main() {
     // Detect and enable Kitty keyboard protocol once at startup
     await detectAndEnableKittyProtocol();
     setWindowTitle(basename(workspaceRoot), settings);
-    console.log("xxx: before render")
     const instance = render(
       <React.StrictMode>
         <SettingsContext.Provider value={settings}>
@@ -290,7 +287,6 @@ export async function main() {
       </React.StrictMode>,
       { exitOnCtrlC: false },
     );
-    console.log("xxx: after render")
 
     checkForUpdates()
       .then((info) => {
@@ -307,7 +303,6 @@ export async function main() {
     return;
   }
 
-  console.log("xxx: after UI")
   // If not a TTY, read from stdin
   // This is for cases where the user pipes input directly into the command
   if (!process.stdin.isTTY) {

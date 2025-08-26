@@ -36,7 +36,7 @@ import { LoadedSettings } from '../../config/settings.js';
 // --- MOCKS ---
 const mockSendMessageStream = vi
   .fn()
-  .mockReturnValue((async function* () {})());
+  .mockReturnValue((async function* () { })());
 const mockStartChat = vi.fn();
 
 const MockedGeminiClientClass = vi.hoisted(() =>
@@ -49,7 +49,7 @@ const MockedGeminiClientClass = vi.hoisted(() =>
 );
 
 const MockedUserPromptEvent = vi.hoisted(() =>
-  vi.fn().mockImplementation(() => {}),
+  vi.fn().mockImplementation(() => { }),
 );
 const mockParseAndFormatApiError = vi.hoisted(() => vi.fn());
 
@@ -341,7 +341,7 @@ describe('useGeminiStream', () => {
     } as unknown as any); // GeminiChat -> any
     mockSendMessageStream
       .mockClear()
-      .mockReturnValue((async function* () {})());
+      .mockReturnValue((async function* () { })());
   });
 
   const mockLoadedSettings: LoadedSettings = {
@@ -398,12 +398,12 @@ describe('useGeminiStream', () => {
           props.handleSlashCommand,
           props.shellModeActive,
           () => 'vscode' as EditorType,
-          () => {},
+          () => { },
           () => Promise.resolve(),
           false,
-          () => {},
-          () => {},
-          () => {},
+          () => { },
+          () => { },
+          () => { },
         );
       },
       {
@@ -448,6 +448,7 @@ describe('useGeminiStream', () => {
           responseParts: [{ text: 'tool 1 response' }],
           error: undefined,
           resultDisplay: 'Tool 1 success display',
+          errorType: undefined,
         },
         tool: {
           name: 'tool1',
@@ -554,12 +555,12 @@ describe('useGeminiStream', () => {
         mockHandleSlashCommand,
         false,
         () => 'vscode' as EditorType,
-        () => {},
+        () => { },
         () => Promise.resolve(),
         false,
-        () => {},
-        () => {},
-        () => {},
+        () => { },
+        () => { },
+        () => { },
       ),
     );
 
@@ -629,12 +630,12 @@ describe('useGeminiStream', () => {
         mockHandleSlashCommand,
         false,
         () => 'vscode' as EditorType,
-        () => {},
+        () => { },
         () => Promise.resolve(),
         false,
-        () => {},
-        () => {},
-        () => {},
+        () => { },
+        () => { },
+        () => { },
       ),
     );
 
@@ -682,6 +683,7 @@ describe('useGeminiStream', () => {
         ],
         resultDisplay: undefined,
         error: undefined,
+        errorType: undefined,
       },
       responseSubmittedToGemini: false,
     };
@@ -710,6 +712,7 @@ describe('useGeminiStream', () => {
         ],
         resultDisplay: undefined,
         error: undefined,
+        errorType: undefined,
       },
       responseSubmittedToGemini: false,
     };
@@ -735,12 +738,12 @@ describe('useGeminiStream', () => {
         mockHandleSlashCommand,
         false,
         () => 'vscode' as EditorType,
-        () => {},
+        () => { },
         () => Promise.resolve(),
         false,
-        () => {},
-        () => {},
-        () => {},
+        () => { },
+        () => { },
+        () => { },
       ),
     );
 
@@ -813,6 +816,7 @@ describe('useGeminiStream', () => {
           responseParts: toolCallResponseParts,
           error: undefined,
           resultDisplay: 'Tool 1 success display',
+          errorType: undefined,
         },
         endTime: Date.now(),
       } as TrackedCompletedToolCall,
@@ -843,12 +847,12 @@ describe('useGeminiStream', () => {
         mockHandleSlashCommand,
         false,
         () => 'vscode' as EditorType,
-        () => {},
+        () => { },
         () => Promise.resolve(),
         false,
-        () => {},
-        () => {},
-        () => {},
+        () => { },
+        () => { },
+        () => { },
       ),
     );
 
@@ -904,7 +908,7 @@ describe('useGeminiStream', () => {
         if (options.isActive) {
           keypressCallback = callback;
         } else {
-          keypressCallback = () => {};
+          keypressCallback = () => { };
         }
       });
     });
@@ -919,7 +923,7 @@ describe('useGeminiStream', () => {
       const mockStream = (async function* () {
         yield { type: 'content', value: 'Part 1' };
         // Keep the stream open
-        await new Promise(() => {});
+        await new Promise(() => { });
       })();
       mockSendMessageStream.mockReturnValue(mockStream);
 
@@ -958,7 +962,7 @@ describe('useGeminiStream', () => {
       const mockStream = (async function* () {
         yield { type: 'content', value: 'Part 1' };
         // Keep the stream open
-        await new Promise(() => {});
+        await new Promise(() => { });
       })();
       mockSendMessageStream.mockReturnValue(mockStream);
 
@@ -972,11 +976,11 @@ describe('useGeminiStream', () => {
           mockHandleSlashCommand,
           false,
           () => 'vscode' as EditorType,
-          () => {},
+          () => { },
           () => Promise.resolve(),
           false,
-          () => {},
-          () => {},
+          () => { },
+          () => { },
           cancelSubmitSpy,
         ),
       );
@@ -1214,6 +1218,7 @@ describe('useGeminiStream', () => {
           responseParts: [{ text: 'Memory saved' }],
           resultDisplay: 'Success: Memory saved',
           error: undefined,
+          errorType: undefined,
         },
         tool: {
           name: 'save_memory',
@@ -1246,12 +1251,12 @@ describe('useGeminiStream', () => {
           mockHandleSlashCommand,
           false,
           () => 'vscode' as EditorType,
-          () => {},
+          () => { },
           mockPerformMemoryRefresh,
           false,
-          () => {},
-          () => {},
-          () => {},
+          () => { },
+          () => { },
+          () => { },
         ),
       );
 
@@ -1299,12 +1304,12 @@ describe('useGeminiStream', () => {
           mockHandleSlashCommand,
           false,
           () => 'vscode' as EditorType,
-          () => {},
+          () => { },
           () => Promise.resolve(),
           false,
-          () => {},
-          () => {},
-          () => {},
+          () => { },
+          () => { },
+          () => { },
         ),
       );
 
@@ -1349,12 +1354,12 @@ describe('useGeminiStream', () => {
           mockHandleSlashCommand,
           false,
           () => 'vscode' as EditorType,
-          () => {},
+          () => { },
           () => Promise.resolve(),
           false,
-          () => {},
-          () => {},
-          () => {},
+          () => { },
+          () => { },
+          () => { },
         ),
       );
 
@@ -1397,12 +1402,12 @@ describe('useGeminiStream', () => {
           mockHandleSlashCommand,
           false,
           () => 'vscode' as EditorType,
-          () => {},
+          () => { },
           () => Promise.resolve(),
           false,
-          () => {},
-          () => {},
-          () => {},
+          () => { },
+          () => { },
+          () => { },
         ),
       );
 
@@ -1446,12 +1451,12 @@ describe('useGeminiStream', () => {
           mockHandleSlashCommand,
           false,
           () => 'vscode' as EditorType,
-          () => {},
+          () => { },
           () => Promise.resolve(),
           false,
-          () => {},
-          () => {},
-          () => {},
+          () => { },
+          () => { },
+          () => { },
         ),
       );
 
@@ -1535,12 +1540,12 @@ describe('useGeminiStream', () => {
             mockHandleSlashCommand,
             false,
             () => 'vscode' as EditorType,
-            () => {},
+            () => { },
             () => Promise.resolve(),
             false,
-            () => {},
-            () => {},
-            () => {},
+            () => { },
+            () => { },
+            () => { },
           ),
         );
 
@@ -1591,12 +1596,12 @@ describe('useGeminiStream', () => {
           mockHandleSlashCommand,
           false,
           () => 'vscode' as EditorType,
-          () => {},
+          () => { },
           () => Promise.resolve(),
           false,
-          () => {},
-          () => {},
-          () => {},
+          () => { },
+          () => { },
+          () => { },
         ),
       );
 
@@ -1669,12 +1674,12 @@ describe('useGeminiStream', () => {
           mockHandleSlashCommand,
           false,
           () => 'vscode' as EditorType,
-          () => {},
+          () => { },
           () => Promise.resolve(),
           false,
-          () => {},
-          () => {},
-          () => {},
+          () => { },
+          () => { },
+          () => { },
         ),
       );
 
@@ -1723,12 +1728,12 @@ describe('useGeminiStream', () => {
           mockHandleSlashCommand,
           false,
           () => 'vscode' as EditorType,
-          () => {},
+          () => { },
           () => Promise.resolve(),
           false,
-          () => {},
-          () => {},
-          () => {},
+          () => { },
+          () => { },
+          () => { },
         ),
       );
 
