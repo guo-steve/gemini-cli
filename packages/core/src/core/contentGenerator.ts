@@ -125,8 +125,6 @@ export async function createContentGenerator(
     'User-Agent': userAgent,
   };
 
-  console.error('xxx', config.authType)
-
   if (
     config.authType === AuthType.LOGIN_WITH_GOOGLE ||
     config.authType === AuthType.CLOUD_SHELL

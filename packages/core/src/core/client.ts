@@ -29,7 +29,6 @@ import { getResponseText } from '../utils/generateContentResponseUtilities.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
 import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat } from './geminiChat.js';
-import { DeepseekChat } from './deepseekChat.js';
 import { retryWithBackoff } from '../utils/retry.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
@@ -256,29 +255,16 @@ export class GeminiClient {
         }
         : this.generateContentConfig;
 
-      if (this.config.getModel().startsWith('deepseek')) {
-        return new DeepseekChat(
-          this.config,
-          this.getContentGenerator(),
-          {
-            systemInstruction,
-            ...generateContentConfigWithThinking,
-            tools,
-          },
-          history,
-        );
-      } else {
-        return new GeminiChat(
-          this.config,
-          this.getContentGenerator(),
-          {
-            systemInstruction,
-            ...generateContentConfigWithThinking,
-            tools,
-          },
-          history,
-        );
-      }
+      return new GeminiChat(
+        this.config,
+        this.getContentGenerator(),
+        {
+          systemInstruction,
+          ...generateContentConfigWithThinking,
+          tools,
+        },
+        history,
+      );
     } catch (error) {
       await reportError(
         error,
@@ -485,8 +471,6 @@ export class GeminiClient {
 
     // Track the original model from the first call to detect model switching
     const initialModel = originalModel || this.config.getModel();
-
-    console.error('xxx: %s', initialModel);
 
     const compressed = await this.tryCompressChat(prompt_id);
 

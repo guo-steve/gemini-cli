@@ -191,8 +191,6 @@ export class Turn {
         this.prompt_id,
       );
 
-      console.error('xxx-resp-stream', responseStream);
-
       for await (const resp of responseStream) {
         if (signal?.aborted) {
           yield { type: GeminiEventType.UserCancelled };

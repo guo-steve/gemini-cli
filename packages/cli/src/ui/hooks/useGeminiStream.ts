@@ -466,8 +466,6 @@ export const useGeminiStream = (
     (event: ServerGeminiFinishedEvent, userMessageTimestamp: number) => {
       const finishReason = event.value;
 
-      console.error('xxx-finishReason', finishReason);
-
       if (pendingHistoryItemRef.current) {
         addItem(pendingHistoryItemRef.current, userMessageTimestamp);
         setPendingHistoryItem(null);
@@ -678,7 +676,6 @@ export const useGeminiStream = (
           abortSignal,
           prompt_id!,
         );
-        console.error('xxx-stream', stream);
         const processingStatus = await processGeminiStreamEvents(
           stream,
           userMessageTimestamp,

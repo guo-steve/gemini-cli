@@ -93,12 +93,6 @@ export class DeepSeekContentGenerator implements ContentGenerator {
       const content = choice?.delta?.content;
       const finishReason = choice?.finish_reason;
       
-      console.error('xxx-deepseek-chunk:', JSON.stringify({
-        content,
-        finishReason,
-        bufferLength: buffer.length
-      }));
-      
       if (content) {
         buffer += content;
       }
@@ -117,10 +111,6 @@ export class DeepSeekContentGenerator implements ContentGenerator {
         ));
       
       if (shouldFlush && buffer.length > 0) {
-        console.error('xxx-deepseek-yielding:', JSON.stringify({
-          text: buffer,
-          reason: finishReason ? 'finish' : 'breakpoint'
-        }));
         const geminiResponse = new GenerateContentResponse();
         geminiResponse.candidates = [{
           content: {
@@ -136,7 +126,6 @@ export class DeepSeekContentGenerator implements ContentGenerator {
       
       // If we have a finish reason but no more content, yield final chunk
       if (finishReason && buffer.length === 0) {
-        console.error('xxx-deepseek-finish-only');
         const geminiResponse = new GenerateContentResponse();
         geminiResponse.candidates = [{
           content: {
@@ -152,7 +141,6 @@ export class DeepSeekContentGenerator implements ContentGenerator {
     
     // Flush any remaining buffer
     if (buffer.length > 0) {
-      console.error('xxx-deepseek-final-flush:', JSON.stringify({ text: buffer }));
       const geminiResponse = new GenerateContentResponse();
       geminiResponse.candidates = [{
         content: {
